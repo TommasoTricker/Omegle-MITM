@@ -5,34 +5,35 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from typing import List
 
-
-LOAD_TIME = 1
-NEW_CHAT_TIME = 25
+PAGE_LOAD_TIME = 1
+NEW_CHAT_FOUND_TIMEOUT = 20
 
 
 class Stranger:
-    def __init__(self, label: str) -> None:
-        self.label = label
+    def __init__(self, interests: List[str]) -> None:
         self.driver = webdriver.Firefox()
         self.banned = False
-        self.waitLoad = WebDriverWait(self.driver, LOAD_TIME)
-        self.waitChat = WebDriverWait(self.driver, NEW_CHAT_TIME)
+        self.waitLoad = WebDriverWait(self.driver, PAGE_LOAD_TIME)
+        self.waitChat = WebDriverWait(self.driver, NEW_CHAT_FOUND_TIMEOUT)
+        self.interests = interests
 
     def setup(self) -> None:
         self.driver.get("https://www.omegle.com/")
 
+        self.waitLoad.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
         try:
-            input_field = self.waitLoad.until(EC.presence_of_element_located((By.CLASS_NAME, "newtopicinput")))
-            input_field.send_keys("english")
-            input_field.send_keys(Keys.RETURN)
+            input_field = self.driver.find_element(By.CLASS_NAME, "newtopicinput")
+            for interest in self.interests:
+                input_field.send_keys(interest)
+                input_field.send_keys(Keys.RETURN)
         except:
             self.banned = True
 
-        element = self.waitLoad.until(EC.element_to_be_clickable((By.ID, "textbtn")))
+        element = self.driver.find_element(By.ID, "textbtn")
         element.click()
 
-        checkboxes = self.waitLoad.until(EC.presence_of_all_elements_located(
-            (By.CSS_SELECTOR, "input[type='checkbox']")))
+        checkboxes = self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
 
         if self.banned == False:
             checkboxes = checkboxes[1:]
@@ -67,11 +68,8 @@ class Stranger:
                 element.click()
             except:
                 pass
-        
-        try:
-            self.waitChat.until(EC.element_to_be_clickable((By.CLASS_NAME, "sendbtn")))
-        except:
-            pass
+
+        self.waitChat.until(EC.element_to_be_clickable((By.CLASS_NAME, "sendbtn")))
 
     def get_messages(self) -> List[str]:
         try:
