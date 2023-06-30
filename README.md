@@ -1,9 +1,11 @@
-## Omegle MITM
-Opens two omegle windows and sends all messages from one to the other, creating a conversation between two strangers you can watch and intervene in.
+## Omegle Man in the Middle
+![Screenshot](Preview.png)
+
+## Requirements
+- Firefox
 
 ## How to use
 Run main.py.
 
-## Requirements
-- Firefox
-- Python with selenium package
+## How it works
+Starts two Omegle chats and sends all messages from one to the other, creating a conversation between two strangers.

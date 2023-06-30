@@ -1,83 +1,133 @@
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from typing import List
 
-PAGE_LOAD_TIME = 1
-NEW_CHAT_FOUND_TIMEOUT = 20
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+SHOW_BROWSER = True
 
 
 class Stranger:
-    def __init__(self, interests: List[str]) -> None:
-        self.driver = webdriver.Firefox()
-        self.banned = False
-        self.waitLoad = WebDriverWait(self.driver, PAGE_LOAD_TIME)
-        self.waitChat = WebDriverWait(self.driver, NEW_CHAT_FOUND_TIMEOUT)
+    def __init__(self, id: int, colour: str, interests: List[str]):
+        self.id = id
+        self.colour = colour
         self.interests = interests
+        self.old_interests = []
+        self.status = "searching"
+        self.message_count = 0
 
-    def setup(self) -> None:
+        if SHOW_BROWSER:
+            self.driver = webdriver.Firefox()
+        else:
+            options = Options()
+            options.headless = True
+            self.driver = webdriver.Firefox(options=options)
+
         self.driver.get("https://www.omegle.com/")
 
-        self.waitLoad.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-
         try:
-            input_field = self.driver.find_element(By.CLASS_NAME, "newtopicinput")
-            for interest in self.interests:
-                input_field.send_keys(interest)
-                input_field.send_keys(Keys.RETURN)
-        except:
+            self.driver.find_element(By.CLASS_NAME, "newtopicinput")
+        except NoSuchElementException:
             self.banned = True
+        else:
+            self.banned = False
 
-        element = self.driver.find_element(By.ID, "textbtn")
-        element.click()
+        self.driver.find_element(By.ID, "textbtn").click()
 
         checkboxes = self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
 
-        if self.banned == False:
+        if self.banned:
+            checkboxes = checkboxes
+        else:
             checkboxes = checkboxes[1:]
 
         for checkbox in checkboxes:
             checkbox.click()
 
-    def start(self) -> None:
-        button = self.driver.find_element(By.XPATH, "//input[@value='Confirm & continue']")
-        button.click()
+        self.driver.find_element(By.XPATH, "//input[@value='Confirm & continue']").click()
 
-    def skipped(self) -> bool:
-        return self.driver.find_elements(By.CLASS_NAME, "chatmsg.disabled")
+        self.disconnect()
 
-    def click_disconnect(self) -> None:
-        button = self.waitLoad.until(EC.element_to_be_clickable((By.CLASS_NAME, "disconnectbtn")))
-        button.click()
+    def check_status(self) -> str:
+        source = self.driver.page_source
 
-    def new_chatting(self) -> None:
-        self.click_disconnect()
-        self.click_disconnect()
-        self.click_disconnect()
+        if source.__contains__("disconnected"):
+            return "disconnected"
+        elif source.__contains__("Looking"):
+            return "searching"
+        elif source.__contains__("You're now"):
+            return "chatting"
+        else:
+            return "searching"
 
-    def new_not_chatting(self) -> None:
-        self.click_disconnect()
+    def send_messages(self, messages: List[str]) -> List[str]:
+        chat_box = self.driver.find_element(By.CLASS_NAME, "chatmsg")
 
-    def wait_till_chat_found(self) -> None:
+        for message in messages:
+            try:
+                chat_box.send_keys(message)
+                chat_box.send_keys(Keys.RETURN)
+            except:
+                messages.remove(message)
+
+        return messages
+
+    def disconnect(self) -> None:
+        if self.check_status() != "disconnected":
+            disconnect_button = self.driver.find_element(By.CLASS_NAME, "disconnectbtn")
+            disconnect_button.click()
+            disconnect_button.click()
+
+    def new(self) -> None:
+        disconnect_button = self.driver.find_element(By.CLASS_NAME, "disconnectbtn")
+        if self.check_status() != "disconnected":
+            disconnect_button.click()
+            disconnect_button.click()
+
+        if self.old_interests != self.interests:
+            elements = self.driver.find_elements(By.TAG_NAME, "a")
+            for element in elements:
+                if element.text == "(Enable)" or element.text == "(Settings)":
+                    element.click()
+
+                    for button in self.driver.find_elements(By.CLASS_NAME, "topictagdelete"):
+                        button.click()
+
+                    input_field = self.driver.find_element(By.CLASS_NAME, "newtopicinput")
+
+                    for interest in self.interests:
+                        input_field.send_keys(interest)
+                        input_field.send_keys(Keys.RETURN)
+
+                    break
+
+            self.old_interests = self.interests
+
+        try:
+            disconnect_button.click()
+        except StaleElementReferenceException:
+            self.new()
+
         if self.banned:
             try:
-                element = self.waitLoad.until(EC.element_to_be_clickable(
-                    (By.XPATH, '//div[@style="position: absolute; right: 0px; bottom: 0px; border-top: 1px solid rgb(63, 159, 255); border-left: 1px solid rgb(63, 159, 255); padding: 0.5em; text-align: center; cursor: pointer; height: 1em; background: white; color: black;"]/span[text()="No"]')))
-                element.click()
-            except:
+                WebDriverWait(self.driver, 1).until(EC.element_to_be_clickable(
+                    (By.XPATH, "//div[span[text()='No']]"))).click()
+            except TimeoutException:
                 pass
 
-        self.waitChat.until(EC.element_to_be_clickable((By.CLASS_NAME, "sendbtn")))
+    def get_new_messages(self) -> List[str]:
+        messages = [x.get_attribute('textContent')
+                    for x in self.driver.find_elements(By.XPATH, '//p[@class="strangermsg"]/span')]
+        new_messages = messages[self.message_count:]
+        self.message_count = len(messages)
 
-    def get_messages(self) -> List[str]:
-        try:
-            return [x.text for x in self.waitLoad.until(EC.presence_of_all_elements_located((By.XPATH, '//p[@class="strangermsg"]/span')))]
-        except:
-            return []
+        return new_messages
 
-    def send_message(self, contents: str) -> None:
-        textarea = self.driver.find_element(By.CLASS_NAME, "chatmsg")
-        textarea.send_keys(contents)
-        textarea.send_keys(Keys.RETURN)
+    def get_common_interests(self) -> List[str]:
+        for element in self.driver.find_elements(By.CLASS_NAME, "statuslog"):
+            if element.text.__contains__("You both like"):
+                return element.text.split("like")[1].strip()[:-1]
