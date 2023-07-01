@@ -46,42 +46,50 @@ def main() -> None:
         stranger.status = "disconnected"
 
     def new_and_view_both() -> None:
-        new_and_view(stranger1)
-        new_and_view(stranger2)
+        if stranger1.status == "chatting":
+            view_status_update(stranger1, "disconnected")
+        stranger1.status = "chatting"
+        stranger1.new()
+
+        if stranger2.status == "chatting":
+            view_status_update(stranger2, "disconnected")
+        stranger2.status = "chatting"
+        stranger2.new()
+
+        stranger1.status = "disconnected"
+        stranger2.status = "disconnected"
+        
 
     def thread_target() -> None:
         def handle_messages(from_stranger: Stranger, to_stranger: Stranger) -> None:
             for message in from_stranger.send_messages(to_stranger.get_new_messages()):
                 view_message(to_stranger, message)
 
-        def handle_status_update(stranger: Stranger) -> None:
+        def handle_status_update(stranger: Stranger, canvas: tk.Canvas) -> None:
             previous = stranger.status
 
             stranger.status = stranger.check_status()
 
-            if (previous == "disconnected" or previous == "searching") and stranger.status == "chatting":
-                stranger.message_count = 0
+            if previous != stranger.status:
+                canvas.itemconfig(oval1, fill=STATUS_COLOURS[stranger.status], outline=STATUS_COLOURS[stranger.status])
+                if (previous == "disconnected" or previous == "searching") and stranger.status == "chatting":
+                    interests = stranger.get_common_interests()
 
-                interests = stranger.get_common_interests()
+                    if interests:
+                        view_status_update(stranger, f"found ({interests})")
+                    else:
+                        view_status_update(stranger, f"found")
 
-                if interests:
-                    view_status_update(stranger, f"found ({interests})")
-                else:
-                    view_status_update(stranger, f"found")
-
-            elif previous == "chatting" and (stranger.status == "disconnected" or stranger.status == "searching"):
-                view_status_update(stranger, "disconnected")
+                elif previous == "chatting" and (stranger.status == "disconnected" or stranger.status == "searching"):
+                    view_status_update(stranger, "disconnected")
 
         start_time = time.time()
         previous_message_count_1 = 0
         previous_message_count_2 = 0
 
         while run.is_set():
-            handle_status_update(stranger1)
-            handle_status_update(stranger2)
-
-            canvas1.itemconfig(oval1, fill=STATUS_COLOURS[stranger1.status], outline=STATUS_COLOURS[stranger1.status])
-            canvas2.itemconfig(oval2, fill=STATUS_COLOURS[stranger2.status], outline=STATUS_COLOURS[stranger2.status])
+            handle_status_update(stranger1, canvas1)
+            handle_status_update(stranger2, canvas2)
 
             if stranger1.status == "chatting" and stranger2.status == "chatting":
                 handle_messages(stranger1, stranger2)
@@ -104,8 +112,11 @@ def main() -> None:
 
         thread_done.set()
 
-    stranger1 = Stranger(1, "red", ["English"])
-    stranger2 = Stranger(2, "blue", ["English"])
+    stranger1 = Stranger(1, "red")
+    stranger1.interests = ["English"]
+
+    stranger2 = Stranger(2, "blue")
+    stranger2.interests = ["English"]
 
     root = tk.Tk()
     root.title("Omegle Man in the Middle: Mess with Strangers!")

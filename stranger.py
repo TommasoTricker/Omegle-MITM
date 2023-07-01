@@ -8,16 +8,19 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-SHOW_BROWSER = True
+SHOW_BROWSER = False
 
 
 class Stranger:
-    def __init__(self, id: int, colour: str, interests: List[str]):
+    def __init__(self, id: int, colour: str):
         self.id = id
         self.colour = colour
-        self.interests = interests
-        self.old_interests = []
+        
         self.status = "searching"
+
+        self.interests = []
+
+        self.old_interests = []
         self.message_count = 0
 
         if SHOW_BROWSER:
@@ -68,11 +71,12 @@ class Stranger:
         chat_box = self.driver.find_element(By.CLASS_NAME, "chatmsg")
 
         for message in messages:
-            try:
-                chat_box.send_keys(message)
-                chat_box.send_keys(Keys.RETURN)
-            except:
-                messages.remove(message)
+            if message:
+                try:
+                    chat_box.send_keys(message)
+                    chat_box.send_keys(Keys.RETURN)
+                except:
+                    messages.remove(message)
 
         return messages
 
@@ -118,6 +122,8 @@ class Stranger:
                     (By.XPATH, "//div[span[text()='No']]"))).click()
             except TimeoutException:
                 pass
+                
+        self.message_count = 0
 
     def get_new_messages(self) -> List[str]:
         messages = [x.get_attribute('textContent')
@@ -129,5 +135,5 @@ class Stranger:
 
     def get_common_interests(self) -> List[str]:
         for element in self.driver.find_elements(By.CLASS_NAME, "statuslog"):
-            if element.text.__contains__("You both like"):
-                return element.text.split("like")[1].strip()[:-1]
+            if element.get_attribute('textContent').__contains__("You both like"):
+                return element.get_attribute('textContent').split("like")[1].strip()[:-1]
