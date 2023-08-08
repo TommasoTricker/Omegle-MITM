@@ -24,7 +24,8 @@ NO_MESSAGES_TIMEOUT = 20
 SHOW_BROWSER = False
 STARTING_INTERESTS = ["English"]
 STATUS_COLOURS = {Status.DISCONNECTED: "red",
-                  Status.SEARCHING: "blue", Status.CHATTING: "green"}
+                  Status.SEARCHING: "blue", 
+                  Status.CHATTING: "green"}
 
 
 @dataclass
@@ -186,7 +187,7 @@ def main() -> None:
                 if stranger.status == Status.CHATTING:
                     interests = ""
                     for element in stranger.driver.find_elements(By.CLASS_NAME, "statuslog"):
-                        if element.get_attribute("textContent").__contains__("You both like"):
+                        if "You both like" in element.get_attribute("textContent"):
                             interests = element.get_attribute(
                                 "textContent").split("like")[1].strip()[:-1]
 
